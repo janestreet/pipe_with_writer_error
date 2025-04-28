@@ -169,7 +169,11 @@ let fold_without_pushback t ~init ~f =
 
 let iter t ~f = Expert.lift_consume t ~f:(Pipe.iter ~f)
 let iter' t ~f = Expert.lift_consume t ~f:(Pipe.iter' ~f)
-let iter_without_pushback t ~f = Expert.lift_consume t ~f:(Pipe.iter_without_pushback ~f)
+
+let iter_without_pushback ?max_iterations_per_job t ~f =
+  Expert.lift_consume t ~f:(Pipe.iter_without_pushback ?max_iterations_per_job ~f)
+;;
+
 let transfer t writer ~f = Expert.lift_consume t ~f:(Fn.flip Pipe.transfer writer ~f)
 let transfer_id = transfer ~f:Fn.id
 let map t ~f = Expert.lift_map t ~f:(Pipe.map ~f)

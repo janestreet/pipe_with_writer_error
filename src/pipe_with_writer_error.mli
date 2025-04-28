@@ -7,26 +7,24 @@ open Async_kernel
     consumed. On writer success the pipe remains open until the writer is explicitly
     closed.
 
-    Motivation:
-    If you had a regular (reader, writer_error) pair and made the mistake of consuming
-    the pipe until you reach EOF and not looking at the writer error, you can drop the
-    writer error on the floor, or hang if the reader doesn't get an EOF when the writer
-    encounters an error. A [Pipe_with_writer_error] forces you to handle the writer error
-    when consuming the reader, and is indifferent to whether the underlying reader reaches
-    EOF when the writer encounters an error (however, it still waits for the reader's
-    [upstream_flushed]).
+    Motivation: If you had a regular (reader, writer_error) pair and made the mistake of
+    consuming the pipe until you reach EOF and not looking at the writer error, you can
+    drop the writer error on the floor, or hang if the reader doesn't get an EOF when the
+    writer encounters an error. A [Pipe_with_writer_error] forces you to handle the writer
+    error when consuming the reader, and is indifferent to whether the underlying reader
+    reaches EOF when the writer encounters an error (however, it still waits for the
+    reader's [upstream_flushed]).
 
-    Pitfalls:
-    When using this module be sure that no writes are made after [writer_error] is filled
-    with an error, or else you will encounter strange behavior. For example, you might
-    [peek] and see the writer error but then [read] and read a subsequent write, which
-    violates the expectation that peek returns the value that will next be read. Writes
-    made in the same async job as the [writer_error] being filled will appear in the pipe,
-    but writes made in subsequent Async jobs will only appear if those jobs run before the
-    job that closes the pipe due to the error. For writes that are made in the same job
-    as the [writer_error] being filled, there is no way to distinguish writes made before
-    and after [writer_error] being filled. Writing after filling [writer_error] with an ok
-    result is fine.
+    Pitfalls: When using this module be sure that no writes are made after [writer_error]
+    is filled with an error, or else you will encounter strange behavior. For example, you
+    might [peek] and see the writer error but then [read] and read a subsequent write,
+    which violates the expectation that peek returns the value that will next be read.
+    Writes made in the same async job as the [writer_error] being filled will appear in
+    the pipe, but writes made in subsequent Async jobs will only appear if those jobs run
+    before the job that closes the pipe due to the error. For writes that are made in the
+    same job as the [writer_error] being filled, there is no way to distinguish writes
+    made before and after [writer_error] being filled. Writing after filling
+    [writer_error] with an ok result is fine.
 
     See ../README.md for a comparison of the semantics of this library and the
     pipe_with_close_reason library. *)
@@ -34,15 +32,15 @@ open Async_kernel
 type ('a, 'error) t [@@deriving sexp_of]
 
 (** [create_reader f] calls [f w] and collects the output [f] writes to [w]. The pipe
-    returned by [create_reader] terminates successfully only when [f w]
-    terminates successfully.
+    returned by [create_reader] terminates successfully only when [f w] terminates
+    successfully.
 
     If [f w] raises an exception, the exception is not caught here: it gets sent to the
     monitor that was in scope when [create_reader] was called. In this case the writer
     will not be closed and the [writer_error] will not be determined (analogous to the
-    behavior of [Pipe.create_reader ~close_on_exception:false]). If you want exceptions
-    to be instead be treated as writer errors you need to catch them yourself and return
-    an appropriate [(unit, 'error) Result.t]. *)
+    behavior of [Pipe.create_reader ~close_on_exception:false]). If you want exceptions to
+    be instead be treated as writer errors you need to catch them yourself and return an
+    appropriate [(unit, 'error) Result.t]. *)
 val create_reader
   :  ?size_budget:int
   -> ('a Pipe.Writer.t -> (unit, 'error) Deferred.Result.t)
@@ -86,8 +84,7 @@ val is_empty : ('a, 'error) t -> bool
 (** [read t] reads an element from the pipe, or returns the writer error if it is filled
     and no elements remain in the pipe.
 
-    [`Eof] is only returned when it's know that the writer terminated successfully.
-*)
+    [`Eof] is only returned when it's know that the writer terminated successfully. *)
 val read : ('a, 'error) t -> ([ `Eof | `Ok of 'a ], 'error) Deferred.Result.t
 
 (** [read' t] is a variant of [read] that reads a batch of elements. *)
@@ -117,8 +114,8 @@ val read_all : ('a, 'error) t -> ('a Queue.t, 'error) Deferred.Result.t
 (** [values_available t] is determined when values become available or the pipe closes.
 
     The implementation of [values_available] is currently not sophisticated enough to
-    avoid an ivar allocation per call, so calling [values_available] in a loop
-    without writing anything to a pipe will result in a memory leak. *)
+    avoid an ivar allocation per call, so calling [values_available] in a loop without
+    writing anything to a pipe will result in a memory leak. *)
 val values_available : ('a, 'error) t -> ([ `Eof | `Ok ], 'error) Deferred.Result.t
 
 val fold
@@ -147,7 +144,8 @@ val iter'
   -> (unit, 'error) Deferred.Result.t
 
 val iter_without_pushback
-  :  ('a, 'error) t
+  :  ?max_iterations_per_job:int
+  -> ('a, 'error) t
   -> f:('a -> unit)
   -> (unit, 'error) Deferred.Result.t
 
@@ -202,8 +200,8 @@ val to_list : ('a, 'error) t -> ('a list, 'error) Deferred.Result.t
     responsibility to properly handle the close status. Be sure you understand the comment
     at the top of this file before using these functions. If you are lifting a function
     that is provided by [Async.Pipe] but is not available here, consider adding it
-    directly instead. Also note that if the [Pipe_with_writer_error.t] was created from
-    a regular [Pipe.Reader.t] the reader exposed here is a different reader. *)
+    directly instead. Also note that if the [Pipe_with_writer_error.t] was created from a
+    regular [Pipe.Reader.t] the reader exposed here is a different reader. *)
 module Expert : sig
   type ('a, 'error) pipe := ('a, 'error) t
 
@@ -216,8 +214,8 @@ module Expert : sig
   (** Get the underlying reader and close status of a [Pipe_with_writer_error.t] *)
   val get : ('a, 'error) pipe -> ('a, 'error) t
 
-  (** Lifts a function that maps one reader to another by transferring the close status
-      to the new reader. *)
+  (** Lifts a function that maps one reader to another by transferring the close status to
+      the new reader. *)
   val lift_map
     :  ('a, 'error) pipe
     -> f:('a Pipe.Reader.t -> 'b Pipe.Reader.t)
