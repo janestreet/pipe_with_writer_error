@@ -149,6 +149,13 @@ val iter_without_pushback
   -> f:('a -> unit)
   -> (unit, 'error) Deferred.Result.t
 
+val iter_parallel
+  :  ?continue_on_error:bool
+  -> ('a, 'error) t
+  -> max_concurrent_jobs:int
+  -> f:('a -> unit Deferred.t)
+  -> (unit, 'error) result Deferred.t
+
 val transfer
   :  ('a, 'error) t
   -> 'b Pipe.Writer.t
@@ -156,8 +163,14 @@ val transfer
   -> (unit, 'error) Deferred.Result.t
 
 val transfer_id : ('a, 'error) t -> 'a Pipe.Writer.t -> (unit, 'error) Deferred.Result.t
-val map : ('a, 'error) t -> f:('a -> 'b) -> ('b, 'error) t
-val map' : ('a, 'error) t -> f:('a Queue.t -> 'b Queue.t Deferred.t) -> ('b, 'error) t
+val map : ?max_batch_size:int -> ('a, 'error) t -> f:('a -> 'b) -> ('b, 'error) t
+
+val map'
+  :  ?max_queue_length:int
+  -> ('a, 'error) t
+  -> f:('a Queue.t -> 'b Queue.t Deferred.t)
+  -> ('b, 'error) t
+
 val map_error : ('a, 'error1) t -> f:('error1 -> 'error2) -> ('a, 'error2) t
 
 val folding_map
@@ -188,6 +201,12 @@ val interleave_custom
   :  ('a, 'error) t list
   -> combine_errors:('error list -> 'combined_error)
   -> ('a, 'combined_error) t
+
+(** The writer error here should be thought of as indicating on both the inner and outer
+    pipe writers. The inner pipes are handled the same way [of_reader] handles its input:
+    if the writer error happens, we expect no further elements will be written, and close
+    the read end of the pipe (after waiting for upstream flushed). *)
+val concat_plain_pipes : ('a Pipe.Reader.t, 'error) t -> ('a, 'error) t
 
 val fork
   :  ('a, 'error) t

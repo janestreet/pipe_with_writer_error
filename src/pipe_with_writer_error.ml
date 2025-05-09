@@ -65,6 +65,13 @@ module Expert = struct
     in
     of_reader reader ~writer_error
   ;;
+
+  (* Unlike [lift_map], this creates a well-behaved [t] even if [f] returns a pipe that
+     never closes in case of error. *)
+  let lift_map_with_deadlock_protection t ~f =
+    let { writer_error; reader } = t in
+    of_reader (f reader) ~writer_error
+  ;;
 end
 
 let create_reader ?size_budget f =
@@ -174,10 +181,14 @@ let iter_without_pushback ?max_iterations_per_job t ~f =
   Expert.lift_consume t ~f:(Pipe.iter_without_pushback ?max_iterations_per_job ~f)
 ;;
 
+let iter_parallel ?continue_on_error t ~max_concurrent_jobs ~f =
+  Expert.lift_consume t ~f:(Pipe.iter_parallel ?continue_on_error ~max_concurrent_jobs ~f)
+;;
+
 let transfer t writer ~f = Expert.lift_consume t ~f:(Fn.flip Pipe.transfer writer ~f)
 let transfer_id = transfer ~f:Fn.id
-let map t ~f = Expert.lift_map t ~f:(Pipe.map ~f)
-let map' t ~f = Expert.lift_map t ~f:(Pipe.map' ~f)
+let map ?max_batch_size t ~f = Expert.lift_map t ~f:(Pipe.map ?max_batch_size ~f)
+let map' ?max_queue_length t ~f = Expert.lift_map t ~f:(Pipe.map' ?max_queue_length ~f)
 
 let map_error t ~f =
   { t with writer_error = Deferred.map t.writer_error ~f:(Result.map_error ~f) }
@@ -199,6 +210,7 @@ let concat_custom ts ~combine_errors =
 ;;
 
 let concat ts = concat_custom ts ~combine_errors:Error.of_list
+let concat_plain_pipes t = Expert.lift_map_with_deadlock_protection t ~f:Pipe.concat_pipe
 
 let interleave_custom ts ~combine_errors =
   Expert.lift_concat ts ~f:Pipe.interleave ~combine_errors
