@@ -20,8 +20,8 @@ let of_reader ~writer_error reader' =
        | Ok () -> return ()
        | Error _ ->
          (* If we close the writer we created we might not have pulled down all the values
-            upstream that were written prior to the error and are ready to be consumed.
-            We need to flush these values before closing the writer. *)
+            upstream that were written prior to the error and are ready to be consumed. We
+            need to flush these values before closing the writer. *)
          let%map (`Ok | `Reader_closed) = Pipe.upstream_flushed reader' in
          Pipe.close writer)
   in
@@ -154,6 +154,12 @@ let peek t =
   | None | Some (Ok ()) -> Ok (Pipe.peek t.reader)
 ;;
 
+let read_now t =
+  match Deferred.peek t.writer_error with
+  | Some (Error _ as error) -> error
+  | None | Some (Ok ()) -> Ok (Pipe.read_now t.reader)
+;;
+
 let read_all t = Expert.lift_consume t ~f:Pipe.read_all
 
 let values_available t =
@@ -192,6 +198,17 @@ let map' ?max_queue_length t ~f = Expert.lift_map t ~f:(Pipe.map' ?max_queue_len
 
 let map_error t ~f =
   { t with writer_error = Deferred.map t.writer_error ~f:(Result.map_error ~f) }
+;;
+
+let map_error' t ~f =
+  { t with
+    writer_error =
+      Deferred.bind t.writer_error ~f:(function
+        | Ok _ as x -> return x
+        | Error e ->
+          let%map e = f e in
+          Error e)
+  }
 ;;
 
 let folding_map t ~init ~f = Expert.lift_map t ~f:(Pipe.folding_map ~init ~f)
