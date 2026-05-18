@@ -17,7 +17,7 @@ depends: [
   "ppx_jane"
   "dune"         {>= "3.17.0"}
 ]
-available: arch != "arm32" & arch != "x86_32"
+available: arch != "x86_32"
 synopsis: "Pipe that forces readers to consider errors from writers while reading"
 description: "
 `Pipe_with_writer_error.t` abstracts the read end of a pipe and a

@@ -58,9 +58,12 @@ val of_reader_with_errors
   -> 'a Or_error.t Pipe.Reader.t
   -> ('a, Error.t) t
 
-val empty : writer_error:(unit, 'error) Deferred.Result.t -> ('a, 'error) t
-val of_list : writer_error:(unit, 'error) Deferred.Result.t -> 'a list -> ('a, 'error) t
-val singleton : writer_error:(unit, 'error) Deferred.Result.t -> 'a -> ('a, 'error) t
+(** For [empty], [of_list], and [singleton], the values are already known so there is
+    usually no error, so [?writer_error] is optional. *)
+
+val empty : ?writer_error:(unit, 'error) Deferred.Result.t -> unit -> ('a, 'error) t
+val of_list : ?writer_error:(unit, 'error) Deferred.Result.t -> 'a list -> ('a, 'error) t
+val singleton : ?writer_error:(unit, 'error) Deferred.Result.t -> 'a -> ('a, 'error) t
 
 (** [close] indicates that the consumer is not interested in the remaining elements of the
     pipe. *)
@@ -80,6 +83,10 @@ val length : ('a, 'error) t -> int
 
 (** [is_empty t] is true iff there are no values in the underlying pipe of [t]. *)
 val is_empty : ('a, 'error) t -> bool
+
+(** [set_size_budget t budget] sets the size budget of the underlying pipe of [t]. See
+    [Pipe.set_size_budget]. *)
+val set_size_budget : ('a, 'error) t -> int -> unit
 
 (** [read t] reads an element from the pipe, or returns the writer error if it is filled
     and no elements remain in the pipe.
@@ -102,6 +109,24 @@ val read_exactly
        ]
        , 'error * 'a Queue.t (* [0 <= Q.length q < num_values] *) )
        Deferred.Result.t
+
+(** This module is basically an accident: it contains the bugged implementations of [peek]
+    and [read_now] which prioritize returning the writer error if known, even if the pipe
+    still have some elements unconsumed. *)
+module Early_error_bug : sig
+  (** [peek t] looks at the first element of the pipe that's available right now, without
+      waiting. If nothing is available it returns [Ok None]. An error is reported if the
+      writer had an error, even if some elements remain in the pipe (or about to be
+      flushed into it). *)
+  val peek : ('a, 'error) t -> ('a option, 'error) Result.t
+
+  (** [read_now] reads a value from the pipe that is immediately available. If the pipe is
+      empty, [read_now] returns [`Eof] if reader is closed and [`Nothing_available] if
+      not. *)
+  val read_now
+    :  ('a, 'error) t
+    -> ([ `Eof | `Nothing_available | `Ok of 'a ], 'error) Result.t
+end
 
 (** [peek t] looks at the first element of the pipe that's available right now, without
     waiting. If nothing is available it returns [Ok None]. An error is reported if the
@@ -168,6 +193,13 @@ val transfer
   -> f:('a -> 'b)
   -> (unit, 'error) Deferred.Result.t
 
+val transfer'
+  :  ?max_queue_length:int
+  -> ('a, 'error) t
+  -> 'b Pipe.Writer.t
+  -> f:('a Queue.t -> 'b Queue.t Deferred.t)
+  -> (unit, 'error) Deferred.Result.t
+
 val transfer_id : ('a, 'error) t -> 'a Pipe.Writer.t -> (unit, 'error) Deferred.Result.t
 val map : ?max_batch_size:int -> ('a, 'error) t -> f:('a -> 'b) -> ('b, 'error) t
 
@@ -189,6 +221,13 @@ val folding_map
 val filter_map : ('a, 'error) t -> f:('a -> 'b option) -> ('b, 'error) t
 val filter_map' : ('a, 'error) t -> f:('a -> 'b option Deferred.t) -> ('b, 'error) t
 val filter : ('a, 'error) t -> f:('a -> bool) -> ('a, 'error) t
+
+val concat_map_list
+  :  ?max_queue_length:int
+  -> ('a, 'error) t
+  -> f:('a -> 'b list)
+  -> ('b, 'error) t
+
 val merge : ('a, Error.t) t list -> compare:('a -> 'a -> int) -> ('a, Error.t) t
 val concat : ('a, Error.t) t list -> ('a, Error.t) t
 val interleave : ('a, Error.t) t list -> ('a, Error.t) t
