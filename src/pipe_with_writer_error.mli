@@ -95,7 +95,10 @@ val set_size_budget : ('a, 'error) t -> int -> unit
 val read : ('a, 'error) t -> ([ `Eof | `Ok of 'a ], 'error) Deferred.Result.t
 
 (** [read' t] is a variant of [read] that reads a batch of elements. *)
-val read' : ('a, 'error) t -> ([ `Eof | `Ok of 'a Queue.t ], 'error) Deferred.Result.t
+val read'
+  :  ?max_queue_length:int
+  -> ('a, 'error) t
+  -> ([ `Eof | `Ok of 'a Queue.t ], 'error) Deferred.Result.t
 
 (** See [Pipe.read_exactly]. When there are fewer than [num_values] elements remaining in
     the pipe and a writer error occurs, the remaining elements are returned in a queue
@@ -170,7 +173,8 @@ val fold_without_pushback
 val iter : ('a, 'error) t -> f:('a -> unit Deferred.t) -> (unit, 'error) Deferred.Result.t
 
 val iter'
-  :  ('a, 'error) t
+  :  ?max_queue_length:int
+  -> ('a, 'error) t
   -> f:('a Queue.t -> unit Deferred.t)
   -> (unit, 'error) Deferred.Result.t
 
