@@ -132,7 +132,7 @@ let length t = Pipe.length t.reader
 let is_empty t = Pipe.is_empty t.reader
 let set_size_budget t budget = Pipe.set_size_budget t.reader budget
 let read t = Expert.lift_read t ~f:Pipe.read
-let read' t = Expert.lift_read t ~f:Pipe.read'
+let read' ?max_queue_length t = Expert.lift_read t ~f:(Pipe.read' ?max_queue_length)
 
 let read_exactly t ~num_values =
   let%bind result = Pipe.read_exactly t.reader ~num_values in
@@ -207,7 +207,10 @@ let fold_without_pushback t ~init ~f =
 ;;
 
 let iter t ~f = Expert.lift_consume t ~f:(Pipe.iter ~f)
-let iter' t ~f = Expert.lift_consume t ~f:(Pipe.iter' ~f)
+
+let iter' ?max_queue_length t ~f =
+  Expert.lift_consume t ~f:(Pipe.iter' ?max_queue_length ~f)
+;;
 
 let iter_without_pushback ?max_iterations_per_job t ~f =
   Expert.lift_consume t ~f:(Pipe.iter_without_pushback ?max_iterations_per_job ~f)
